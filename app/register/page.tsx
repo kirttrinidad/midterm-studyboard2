@@ -14,18 +14,41 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // TODO (Step 6): Implement the register submit handler.
-  // 1. Prevent default submission and clear any previous error.
-  // 2. POST to /api/register with { name, email, password } as JSON.
-  // 3. If the response is not ok, parse the error message from the body
-  //    and display it.
-  // 4. If registration succeeded, immediately sign the user in — call
-  //    signIn("credentials", { email, password, redirect: false }) so they
-  //    don't have to fill out the login form right after registering.
-  // 5. On success, router.push("/groups") and router.refresh().
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError("TODO: implement register submit handler");
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Registration failed");
+      }
+
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        throw new Error("Something went wrong.");
+      }
+
+      router.push("/groups");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (

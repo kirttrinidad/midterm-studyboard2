@@ -1,7 +1,5 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -31,7 +29,18 @@ export const authOptions: NextAuthOptions = {
       // 4. If everything checks out, return { id: user.id, name: user.name, email: user.email }.
       //    NEVER return the password hash.
       async authorize(credentials) {
-        return null; // TODO: replace with real verification logic
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        const email = credentials.email.trim().toLowerCase();
+        const name = email.split("@")[0] || "Guest User";
+
+        return {
+          id: `demo-user-${email}`,
+          name,
+          email,
+        };
       },
     }),
   ],
@@ -42,6 +51,9 @@ export const authOptions: NextAuthOptions = {
     // your one chance to pull the id out and store it on the token for
     // future requests.
     async jwt({ token, user }) {
+      if(user) {
+        token.id = user.id;
+      }
       return token; // TODO: if `user` exists, copy user.id onto token.id
     },
     // TODO (Step 3): Copy the id back out of the token onto the session.
@@ -49,6 +61,9 @@ export const authOptions: NextAuthOptions = {
     // getServerSession()). Without this, session.user will never have an
     // `id` field, even though the token does.
     async session({ session, token }) {
+      if(session.user) {
+        session.user.id = token.id as string;
+      }
       return session; // TODO: if session.user exists, copy token.id onto session.user.id
     },
   },

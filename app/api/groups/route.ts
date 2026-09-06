@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
-// TODO (Step 12): import { getServerSession } from "next-auth";
-// TODO (Step 12): import { authOptions } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { getGroups, createGroup } from "@/lib/data";
 
-// GET /api/groups — list every group. Stays PUBLIC — no changes needed.
 export async function GET() {
   const groups = await getGroups();
   return NextResponse.json(groups);
 }
 
-// TODO (Step 12): POST /api/groups — create a new group. Requires authentication.
-// 1. Get the session: const session = await getServerSession(authOptions);
-// 2. If there's no session, return 401 with an error message.
-// 3. Parse and validate the body (name, subject required) — this part is
-//    already written for you below.
-// 4. Call createGroup with ownerId: session.user.id added to the input.
 export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
 
   if (!body.name || !body.subject) {
@@ -25,13 +23,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // TODO: replace this — a group currently has no owner, which will
-  // throw a Prisma error since ownerId is required in the schema.
   const newGroup = await createGroup({
     name: body.name,
     subject: body.subject,
     memberCount: body.memberCount,
-    ownerId: "TODO-replace-with-session.user.id",
+    ownerId: session.user.id,
   });
 
   return NextResponse.json(newGroup, { status: 201 });
