@@ -1,46 +1,43 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { registerSchema } from "@/lib/validations";
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const password = typeof body.password === "string" ? body.password : "";
+  const body = await request.json();
+  const parsedResponse = registerSchema.safeParse(body);
 
-  if (!name || !email || !password) {
+  if (!parsedResponse.success) {
     return NextResponse.json(
-      { error: "Name, email, and password are required" },
+      { error: parsedResponse.error.issues[0].message },
       { status: 400 }
     );
   }
 
-  if (password.length < 8) {
-    return NextResponse.json(
-      { error: "Password must be at least 8 characters long" },
-      { status: 400 }
-    );
-  }
+  const { name, email, password } = parsedResponse.data;
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const existingUser = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
+
   if (existingUser) {
     return NextResponse.json(
-      { error: "An account with that email already exists" },
+      { error: "An account with this email already exists" },
       { status: 409 }
     );
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({
+  const newUser = await prisma.user.create({
     data: {
       name,
-      email,
+      email: email.toLowerCase(),
       password: hashedPassword,
     },
   });
 
   return NextResponse.json(
-    { id: user.id, name: user.name, email: user.email },
+    { id: newUser.id, name: newUser.name, email: newUser.email },
     { status: 201 }
   );
 }
