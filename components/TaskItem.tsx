@@ -2,99 +2,170 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Task } from "@/lib/data";
-import Button from "@/components/Button";
+
+type Task = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
+type TaskItemProps = {
+  task: Task;
+  groupId: string;
+  isOwner: boolean;
+};
 
 export default function TaskItem({
   task,
   groupId,
   isOwner,
-}: {
-  task: Task;
-  groupId: string;
-  isOwner: boolean;
-}) {
+}: TaskItemProps) {
   const router = useRouter();
-  const [done, setDone] = useState(task.done);
-  const [isDeleting, setIsDeleting] = useState(false);
+
   const [error, setError] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleToggle() {
-    if (!isOwner) return;
-
-    const previousDone = done;
-    const nextDone = !previousDone;
-    setDone(nextDone);
     setError("");
+    setIsUpdating(true);
 
     try {
       const response = await fetch(
         `/api/groups/${groupId}/tasks/${task.id}`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ done: nextDone }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            done: !task.done,
+          }),
         }
       );
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to update task");
+      const text = await response.text();
+
+      let data: any = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          // Ignore non-JSON response
+        }
       }
-    } catch (err) {
-      setDone(previousDone);
-      setError(err instanceof Error ? err.message : "Could not update task");
-    }
-  }
-
-  async function handleDelete() {
-    if (!isOwner) return;
-
-    setIsDeleting(true);
-    setError("");
-
-    try {
-      const response = await fetch(
-        `/api/groups/${groupId}/tasks/${task.id}`,
-        { method: "DELETE" }
-      );
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete task");
+        throw new Error(
+          data.error || "Failed to update task"
+        );
       }
 
       router.refresh();
     } catch (err) {
+      console.error("UPDATE TASK ERROR:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update task"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this task?"
+    );
+
+    if (!confirmed) return;
+
+    setError("");
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(
+        `/api/groups/${groupId}/tasks/${task.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const text = await response.text();
+
+      let data: any = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          // Ignore non-JSON response
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to delete task"
+        );
+      }
+
+      router.refresh();
+    } catch (err) {
+      console.error("DELETE TASK ERROR:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete task"
+      );
+    } finally {
       setIsDeleting(false);
-      setError(err instanceof Error ? err.message : "Could not delete task");
     }
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-md border px-3 py-2">
-      <input
-        type="checkbox"
-        checked={done}
-        onChange={handleToggle}
-        disabled={!isOwner || isDeleting}
-        className="h-4 w-4"
-      />
-      <span className={done ? "line-through text-gray-400" : ""}>
-        {task.title}
-      </span>
-      {isOwner && (
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="ml-auto px-2 py-1 text-xs"
+    <li className="flex items-center justify-between rounded-md border px-4 py-3">
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          checked={task.done}
+          onChange={handleToggle}
+          disabled={isUpdating || isDeleting}
+          className="h-5 w-5"
+        />
+
+        <span
+          className={
+            task.done
+              ? "text-gray-400 line-through"
+              : ""
+          }
         >
-          {isDeleting ? "Deleting..." : "Delete"}
-        </Button>
-      )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+          {task.title}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {isOwner && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting || isUpdating}
+            className="rounded-md bg-gray-200 px-4 py-2 hover:bg-gray-300 disabled:opacity-50"
+          >
+            {isDeleting ? "Deleting..." : "Delete"}
+          </button>
+        )}
+
+        {error && (
+          <span className="text-sm text-red-600">
+            {error}
+          </span>
+        )}
+      </div>
     </li>
   );
 }
