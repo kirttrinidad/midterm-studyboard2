@@ -27,11 +27,10 @@ export default function NewGroupForm() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Failed to create group");
+        throw new Error(data.error ?? "Could not create group");
       }
 
       router.push(`/groups/${data.id}`);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create group");
     } finally {

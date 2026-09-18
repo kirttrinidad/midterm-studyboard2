@@ -1,5 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -34,12 +36,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.trim().toLowerCase();
-        const name = email.split("@")[0] || "Guest User";
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user || !(await bcrypt.compare(credentials.password, user.password))) {
+          return null;
+        }
 
         return {
-          id: `demo-user-${email}`,
-          name,
-          email,
+          id: user.id,
+          name: user.name,
+          email: user.email,
         };
       },
     }),
